@@ -1,0 +1,15 @@
+# Local development database only. The password below is for a throwaway
+# container on your machine and matches appsettings.Development.json.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: SmartMeetingSystem
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:

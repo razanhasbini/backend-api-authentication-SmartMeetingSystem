@@ -18,3 +18,7 @@ out/
 
 *.log
 logs/
+
+# Local configuration overrides
+appsettings.*.local.json
+.env

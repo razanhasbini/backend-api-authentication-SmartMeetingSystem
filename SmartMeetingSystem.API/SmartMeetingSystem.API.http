@@ -8,7 +8,7 @@ Content-Type: {{json}}
 {
 	"userName": "user1",
 	"email": "user1@example.com",
-	"password": "User#12345",
+	"password": "<your-password>",
 	"fullName": "User One"
 }
 
@@ -18,11 +18,12 @@ Content-Type: {{json}}
 
 {
 	"userNameOrEmail": "admin@smartmeetings.local",
-	"password": "Admin#12345"
+	"password": "<your-password>"
 }
 
 ### Create a room (requires Admin role)
-@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkODcyMGQ1My0wODg1LTQ0ZDgtYjFlMC0wMGEwNTJhZTdmNGQiLCJ1bmlxdWVfbmFtZSI6ImFkbWluIiwiZW1haWwiOiJhZG1pbkBzbWFydG1lZXRpbmdzLmxvY2FsIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQWRtaW4iLCJleHAiOjE3NTg1NjI2MjksImlzcyI6IlNtYXJ0TWVldGluZ1N5c3RlbSIsImF1ZCI6IlNtYXJ0TWVldGluZ1N5c3RlbVVzZXJzIn0.5PLYW5MeUy9XmFBU0xfez02nXhYrbyS4GNsnfVdKFtw
+# Paste the accessToken returned by the login request above
+@token = <paste-token-here>
 POST {{host}}/api/Rooms
 Authorization: Bearer {{token}}
 Content-Type: {{json}}

@@ -7,8 +7,12 @@ public class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Applicati
 {
     public ApplicationDbContext CreateDbContext(string[] args)
     {
+        // Used only by `dotnet ef` at design time.
+        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+            ?? "Host=localhost;Port=5432;Database=SmartMeetingSystem;Username=postgres;Password=postgres";
+
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql("Host=localhost;Database=SmartMeetingSystemDB;Username=postgres;Password=peaches123")
+            .UseNpgsql(connectionString)
             .Options;
 
         return new ApplicationDbContext(options);

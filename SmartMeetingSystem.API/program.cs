@@ -17,8 +17,20 @@ using SmartMeetingSystem.API.Services;
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
+var connectionString = config.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+    throw new InvalidOperationException(
+        "ConnectionStrings:DefaultConnection is not set. Use appsettings.Development.json with the local " +
+        "docker-compose database, or set the ConnectionStrings__DefaultConnection environment variable.");
+
+var jwtKey = config["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey) || Encoding.UTF8.GetByteCount(jwtKey) < 32)
+    throw new InvalidOperationException(
+        "Jwt:Key must be set to at least 32 bytes. For local development run: " +
+        "dotnet user-secrets set \"Jwt:Key\" \"$(openssl rand -hex 32)\" --project SmartMeetingSystem.API");
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(config.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(connectionString));
 
 builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
 {
@@ -31,7 +43,7 @@ builder.Services.AddIdentity<AppUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!));
+var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
 builder.Services.AddAuthentication(options =>
 {
@@ -134,19 +146,11 @@ app.UseEndpoints(endpoints =>
     endpoints.MapControllers();
 });
 
-// ✅ Database Migration & Seeding (Admin + User)
+// Database migration, roles, and (Development only) demo accounts
 using (var scope = app.Services.CreateScope())
 {
-    try
-    {
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        await db.Database.MigrateAsync();
-        Console.WriteLine("✅ Database migrated");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"❌ Database migration failed: {ex.Message}");
-    }
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await db.Database.MigrateAsync();
 
     var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
     var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
@@ -156,35 +160,28 @@ using (var scope = app.Services.CreateScope())
         if (!await roleMgr.RoleExistsAsync(r))
             await roleMgr.CreateAsync(new IdentityRole(r));
 
-    var adminEmail = "admin@smartmeetings.local";
-    var admin = await userMgr.FindByEmailAsync(adminEmail);
-    if (admin == null)
+    // Demo accounts are created only in Development and only when a password is
+    // configured (dotnet user-secrets set "Seed:AdminPassword" "..."), so no
+    // deployment ever ships with a known admin password.
+    if (app.Environment.IsDevelopment())
     {
-        admin = new AppUser
-        {
-            UserName = "admin",
-            Email = adminEmail,
-            EmailConfirmed = true,
-            FullName = "System Admin"
-        };
-        await userMgr.CreateAsync(admin, "Admin#12345");
-        await userMgr.AddToRoleAsync(admin, "Admin");
-    }
-
-    var userEmail = "user@smartmeetings.local";
-    var normalUser = await userMgr.FindByEmailAsync(userEmail);
-    if (normalUser == null)
-    {
-        normalUser = new AppUser
-        {
-            UserName = "user",
-            Email = userEmail,
-            EmailConfirmed = true,
-            FullName = "Default User"
-        };
-        await userMgr.CreateAsync(normalUser, "User#12345");
-        await userMgr.AddToRoleAsync(normalUser, "User");
+        await SeedUserAsync(userMgr, "admin", "admin@smartmeetings.local", "System Admin", "Admin", config["Seed:AdminPassword"]);
+        await SeedUserAsync(userMgr, "user", "user@smartmeetings.local", "Default User", "User", config["Seed:UserPassword"]);
     }
 }
 
 app.Run();
+
+static async Task SeedUserAsync(
+    UserManager<AppUser> userMgr, string userName, string email, string fullName, string role, string? password)
+{
+    if (string.IsNullOrWhiteSpace(password) || await userMgr.FindByEmailAsync(email) != null)
+        return;
+
+    var user = new AppUser { UserName = userName, Email = email, EmailConfirmed = true, FullName = fullName };
+    var result = await userMgr.CreateAsync(user, password);
+    if (!result.Succeeded)
+        throw new InvalidOperationException(
+            $"Could not seed {userName}: {string.Join("; ", result.Errors.Select(e => e.Description))}");
+    await userMgr.AddToRoleAsync(user, role);
+}
